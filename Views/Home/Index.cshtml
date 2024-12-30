@@ -1,0 +1,101 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React File Upload</title>
+    <script src="~/react.development.js"></script>
+    <script src="~/react-dom.development.js"></script>
+    <script src="~/axios.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script>
+        const { useState } = React;
+        const secretKey = "mysecretkey";
+        const FileUpload = () => {
+          const [file, setFile] = useState(null);
+          const [progress, setProgress] = useState(0);
+
+          const CHUNK_SIZE = 500 * 1024; // 500 KB
+
+          const handleFileChange = (e) => {
+            setFile(e.target.files[0]);
+          };
+
+          const uploadFile = async () => {
+            if (!file) {
+              alert("Please select a file first!");
+              return;
+            }
+
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            var result = null;
+            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+              const start = chunkIndex * CHUNK_SIZE;
+              const end = Math.min(start + CHUNK_SIZE, file.size);
+
+              const chunk = file.slice(start, end);
+              const formData = new FormData();
+              formData.append("chunk", chunk);
+              formData.append("fileName", result?.data.fileName ?? file.name);
+              formData.append("chunkIndex", chunkIndex);
+              formData.append("totalChunks", totalChunks);
+
+              try {
+                result = await axios.post(`/api/Images/UploadChunk?apiKey=${secretKey}`, formData, {
+                  headers: { "Content-Type": "multipart/form-data" },
+                });
+
+                setProgress(((chunkIndex + 1) / totalChunks) * 100);
+              } catch (error) {
+                console.error("Error uploading chunk", error);
+                alert(error.response.data);
+                return;
+              }
+            }
+            try {
+                const formData = new FormData();
+                formData.append("fileName", result.data.fileName);
+                formData.append("fileType", file.name.substring(file.name.lastIndexOf(".")));
+                await axios.post(`/api/Images/Upload?apiKey=${secretKey}`, formData, {
+                  headers: { "Content-Type": "multipart/form-data" },
+                });
+              } catch (error) {
+                console.error("Error uploading chunk", error);
+                alert(error.response.data);
+                return;
+              }
+            alert("File uploaded successfully!");
+          };
+
+          return (
+            React.createElement("div", null,
+              React.createElement("h2", null, "Chunked File Upload"),
+              React.createElement("input", {
+                type: "file",
+                onChange: handleFileChange
+              }),
+              React.createElement("button", {
+                onClick: uploadFile
+              }, "Upload"),
+              React.createElement("div", {
+                style: { marginTop: "20px", width: "100%", background: "#ccc" }
+              },
+                React.createElement("div", {
+                  style: {
+                    width: `${progress}%`,
+                    background: "green",
+                    height: "20px"
+                  }
+                })
+              ),
+              React.createElement("p", null, `${progress.toFixed(2)}% uploaded`)
+            )
+          );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(FileUpload));
+    </script>
+</body>
+</html>
