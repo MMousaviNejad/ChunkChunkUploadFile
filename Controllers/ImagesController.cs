@@ -18,20 +18,17 @@ namespace UploadFile.Controllers
         public async Task<IActionResult> UploadChunk(string apiKey, [FromForm] IFormFile chunk, [FromForm] string fileName, [FromForm] int chunkIndex, [FromForm] int totalChunks)
         {
             Response.Headers.Add("Content-Security-Policy", "default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self';");
-            if (Guid.TryParse(fileName,out var fileGuid))
-            {
-                fileName = fileGuid.ToString();
-            }
-            else
-            {
-                fileName = Guid.NewGuid().ToString();
-            }
 
             if (apiKey != "mysecretkey")
                 return Unauthorized("Invalid API Key");
 
             if (chunk == null || chunk.Length == 0 || string.IsNullOrEmpty(fileName))
                 return BadRequest("Invalid chunk data.");
+
+            if (fileName.Contains('.') && !Guid.TryParse(fileName.Substring(0, fileName.LastIndexOf('.')), out _))
+            {
+                fileName = Guid.NewGuid().ToString() + fileName.Substring(fileName.LastIndexOf('.'));
+            }
 
             string tempFolder = Path.Combine(_environment.WebRootPath, "TempUploads", fileName);
 
@@ -60,7 +57,7 @@ namespace UploadFile.Controllers
                     await chunk.CopyToAsync(stream);
                 }
 
-                return Ok(new { success = true, chunkIndex , fileName });
+                return Ok(new { success = true, chunkIndex, fileName });
             }
             catch (Exception ex)
             {
@@ -71,7 +68,7 @@ namespace UploadFile.Controllers
         }
 
         [HttpPost("Upload")]
-        public async Task<IActionResult> Upload(string apiKey, [FromForm] string fileName, [FromForm] string fileType)
+        public async Task<IActionResult> Upload(string apiKey, [FromForm] string fileName)
         {
 
             if (apiKey != "mysecretkey")
@@ -82,7 +79,7 @@ namespace UploadFile.Controllers
             if (!Directory.Exists(tempFolder))
                 return NotFound("File not found!");
 
-            string finalPath = Path.Combine(_environment.WebRootPath, "Uploads", fileName + fileType);
+            string finalPath = Path.Combine(_environment.WebRootPath, "Uploads", fileName);
             if (!Directory.Exists(Path.GetDirectoryName(finalPath)))
                 Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
 
